@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Asistent Of Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -10,15 +10,16 @@
 
         body {
             font-family: 'Product Sans', Arial, sans-serif;
-            overflow-x: hidden;
+            /* Prevenir rebote de scroll en iOS */
+            overscroll-behavior-y: none;
         }
 
-        /* Animación de carga */
+        /* Animación de carga mejorada */
         .dot-flashing {
             position: relative;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
             background-color: #3b82f6;
             animation: dot-flashing 1s infinite linear alternate;
             animation-delay: .5s;
@@ -28,77 +29,81 @@
             display: inline-block;
             position: absolute;
             top: 0;
-        }
-        .dot-flashing::before {
-            left: -15px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
             background-color: #3b82f6;
             animation: dot-flashing 1s infinite alternate;
-            animation-delay: 0s;
         }
-        .dot-flashing::after {
-            left: 15px;
-            width: 10px;
-            height: 10px;
-            border-radius: 5px;
-            background-color: #3b82f6;
-            animation: dot-flashing 1s infinite alternate;
-            animation-delay: 1s;
-        }
+        .dot-flashing::before { left: -12px; animation-delay: 0s; }
+        .dot-flashing::after { left: 12px; animation-delay: 1s; }
 
         @keyframes dot-flashing {
             0% { background-color: #3b82f6; }
-            50%, 100% { background-color: #ebebeb; }
+            50%, 100% { background-color: #e5e7eb; }
         }
 
         .bg-gradient-custom {
-            background: radial-gradient(circle at 50% 50%, #ffffff 0%, #f9fafb 100%);
+            background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f3f4f6 100%);
+            background-attachment: fixed;
+        }
+        
+        /* Ocultar barra de scroll en las tarjetas para limpieza visual */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     </style>
 </head>
 
-<body class="bg-gradient-custom min-h-screen flex flex-col items-center p-6">
+<body class="bg-gradient-custom min-h-screen flex flex-col items-center p-3 md:p-6 pb-20">
 
-    <header class="mt-10 mb-8 text-center select-none transform transition-all hover:scale-105 duration-500">
-        <h1 class="text-5xl md:text-7xl font-bold tracking-tighter">
+    <header class="mt-6 mb-6 md:mt-10 md:mb-8 text-center select-none transition-all duration-500">
+        <h1 class="text-4xl md:text-7xl font-bold tracking-tighter">
             <span class="text-blue-500">A</span><span class="text-red-500">s</span><span
                 class="text-yellow-500">i</span><span class="text-blue-500">s</span><span
                 class="text-green-500">t</span><span class="text-red-500">e</span><span class="text-gray-700">nt</span>
         </h1>
-        <p class="text-lg text-gray-400 font-light mt-2 tracking-widest uppercase">Of Search</p>
+        <p class="text-xs md:text-lg text-gray-400 font-light mt-1 tracking-widest uppercase">Of Search</p>
     </header>
 
-    <div class="w-full max-w-2xl z-10">
-        <div class="group relative flex items-center border border-gray-200 rounded-full px-6 py-4 hover:shadow-xl focus-within:shadow-xl focus-within:border-blue-300 transition-all duration-300 bg-white">
-            <input type="text" id="userInput" placeholder="Ej: Arduino Uno, Sensor ultrasonido..."
-                class="flex-grow outline-none text-lg text-gray-700 bg-transparent placeholder-gray-400" 
+    <div class="w-full max-w-2xl z-50 sticky top-2 md:top-4">
+        <div class="group relative flex items-center border border-gray-200/80 rounded-full px-4 py-3 md:px-6 md:py-4 shadow-lg shadow-blue-500/5 hover:shadow-xl focus-within:shadow-blue-500/20 focus-within:border-blue-300 transition-all duration-300 bg-white/90 backdrop-blur-md">
+            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            
+            <input type="text" id="userInput" placeholder="Buscar componente..."
+                class="flex-grow outline-none text-base md:text-lg text-gray-700 bg-transparent placeholder-gray-400" 
+                autocomplete="off"
                 onkeypress="handleKeyPress(event)">
+            
             <button onclick="sendQuery()"
-                class="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-bold transition-all transform active:scale-95 shadow-md">
-                Enviar
+                class="ml-2 bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-6 md:py-2 rounded-full font-bold transition-all transform active:scale-95 shadow-md flex items-center justify-center">
+                <span class="hidden md:inline">Enviar</span>
+                <svg class="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
             </button>
         </div>
     </div>
 
-    <div id="loadingIndicator" class="hidden mt-8">
+    <div id="loadingIndicator" class="hidden mt-6">
         <div class="dot-flashing"></div>
     </div>
 
-    <main class="w-full max-w-6xl mt-8">
+    <main class="w-full max-w-7xl mt-6 flex-grow">
         
-        <div id="resultBox" class="hidden mb-8 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm text-center">
-            <p id="responseText" class="text-gray-800 text-lg"></p>
+        <div id="resultBox" class="hidden mb-6 p-4 bg-white/80 backdrop-blur rounded-2xl border border-gray-100 shadow-sm text-center">
+            <p id="responseText" class="text-gray-800 text-sm md:text-lg font-medium"></p>
         </div>
 
-        <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 items-start pb-10">
             </div>
 
     </main>
 
-    <footer class="mt-auto py-6 text-gray-400 text-sm text-center">
-        &copy; 2026 Asistent Of Search - Potenciado por Python FastAPI
+    <footer class="py-4 text-gray-300 text-xs text-center">
+        &copy; 2026 Asistent Of Search
     </footer>
 
     <script>
@@ -116,14 +121,14 @@
             const message = input.value.trim();
             if (!message) return;
 
-            // 1. Preparar UI (Limpiar anterior y mostrar carga)
+            // UI Reset
+            input.blur(); // Ocultar teclado en móvil
             resultBox.classList.add('hidden');
-            cardsContainer.innerHTML = ''; // Limpiar tarjetas viejas
+            cardsContainer.innerHTML = '';
             loading.classList.remove('hidden');
             input.disabled = true;
 
             try {
-                // 2. Petición al Backend
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -132,14 +137,10 @@
                 
                 const data = await response.json();
                 
-                // 3. Ocultar carga y mostrar resultados
                 loading.classList.add('hidden');
-                
-                // Mostrar mensaje resumen
                 resultBox.classList.remove('hidden');
-                responseText.innerText = data.reply || "Respuesta recibida";
+                responseText.innerText = data.reply || "Hecho.";
 
-                // 4. Renderizar tarjetas si hay resultados
                 if (data.results) {
                     renderCards(data.results);
                 }
@@ -147,72 +148,86 @@
             } catch (error) {
                 loading.classList.add('hidden');
                 resultBox.classList.remove('hidden');
-                responseText.innerHTML = `<span class="text-red-500 font-bold">Error:</span> No pude conectar con main.py. <br>Asegúrate de que el servidor Python esté corriendo.`;
+                responseText.innerHTML = `<span class="text-red-500">Error de conexión</span>`;
                 console.error(error);
             } finally {
                 input.disabled = false;
-                input.focus();
+                // No hacemos focus() automático en móvil para no abrir el teclado de nuevo
             }
         }
 
         function renderCards(resultadosAgrupados) {
             const container = document.getElementById('cardsContainer');
             
-            // Recorremos las tiendas (Vistronica, Electronilab)
             for (const [nombreTienda, productos] of Object.entries(resultadosAgrupados)) {
-
-                // Si la tienda no trajo productos, no mostramos tarjeta vacía
                 if (!productos || productos.length === 0) continue;
 
-                // Estilos dinámicos según la tienda
-                const isVistronica = nombreTienda === 'Vistronica';
-                // Vistronica = Naranja, Electronilab = Azul
-                const headerColor = isVistronica ? 'bg-orange-500' : 'bg-blue-600';
-                const badgeColor = isVistronica ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800';
-                const borderColor = isVistronica ? 'border-orange-200' : 'border-blue-200';
+                let headerColor, badgeColor, borderColor;
 
-                // Generar lista de items HTML
+                // Definición de colores
+                switch (nombreTienda) {
+                    case 'Vistronica': 
+                        headerColor = 'bg-orange-500';
+                        badgeColor = 'bg-orange-50 text-orange-700 border-orange-100';
+                        borderColor = 'border-orange-100';
+                        break;
+                    case 'Electronilab': 
+                        headerColor = 'bg-blue-600';
+                        badgeColor = 'bg-blue-50 text-blue-700 border-blue-100';
+                        borderColor = 'border-blue-100';
+                        break;
+                    case 'Zamux': 
+                        headerColor = 'bg-[#D2040F]';
+                        badgeColor = 'bg-red-50 text-[#D2040F] border-red-100';
+                        borderColor = 'border-red-100'; // Ajustado a un color Tailwind válido cercano
+                        break;
+                    default: 
+                        headerColor = 'bg-gray-700';
+                        badgeColor = 'bg-gray-100 text-gray-800';
+                        borderColor = 'border-gray-200';
+                }
+
+                // Renderizado de items (Más compacto para móvil)
                 let itemsHTML = productos.map(p => `
-                <li class="flex items-start p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors duration-150">
-                    <div class="flex-shrink-0 w-12 h-12 border border-gray-200 rounded-lg overflow-hidden bg-white p-1">
+                <li class="flex items-center p-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                    <div class="flex-shrink-0 w-12 h-12 border border-gray-100 rounded-lg overflow-hidden bg-white p-1">
                         <img src="${p.imagen || 'https://via.placeholder.com/48?text=N/A'}" 
-                             alt="img" class="w-full h-full object-contain">
+                             alt="img" class="w-full h-full object-contain" loading="lazy">
                     </div>
-                    <div class="ml-4 flex-1">
-                        <a href="${p.url}" target="_blank" class="text-sm font-semibold text-gray-900 hover:text-blue-600 hover:underline leading-snug block mb-1">
+                    <div class="ml-3 flex-1 min-w-0"> <a href="${p.url}" target="_blank" class="text-sm font-semibold text-gray-900 hover:text-blue-600 truncate block">
                             ${p.nombre}
                         </a>
-                        <div class="flex justify-between items-center">
+                        <div class="flex justify-between items-center mt-1">
                             <span class="text-sm font-bold text-gray-800">${p.precio}</span>
-                            <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                                Stock: ${p.stock || '?'}
+                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full border ${p.stock === 'Agotado' ? 'text-red-500 bg-red-50 border-red-100' : 'text-green-600 bg-green-50 border-green-100'}">
+                                ${p.stock || 'Stock?'}
                             </span>
                         </div>
                     </div>
                 </li>
                 `).join('');
 
-                // Generar la Tarjeta Principal de la Tienda
+                // Tarjeta Principal
                 const storeCardHTML = `
-                <div class="bg-white rounded-2xl shadow-xl border ${borderColor} overflow-hidden flex flex-col h-full transform transition-all hover:-translate-y-1 hover:shadow-2xl">
-                    <div class="${headerColor} px-5 py-4 flex justify-between items-center text-white">
-                        <h3 class="font-bold text-xl tracking-wide flex items-center gap-2">
+                <div class="bg-white rounded-xl shadow-lg shadow-gray-200/50 border ${borderColor} overflow-hidden flex flex-col h-full">
+                    <div class="${headerColor} px-4 py-3 flex justify-between items-center text-white shadow-sm">
+                        <h3 class="font-bold text-lg tracking-wide flex items-center gap-2 truncate">
                              ${nombreTienda}
                         </h3>
-                        <span class="bg-white/25 text-white text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm">
-                            ${productos.length} items
+                        <span class="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded-md backdrop-blur-sm">
+                            ${productos.length}
                         </span>
                     </div>
 
-                    <div class="overflow-y-auto max-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                    <div class="overflow-y-auto max-h-[400px] scrollbar-hide">
                         <ul class="divide-y divide-gray-50">
                             ${itemsHTML}
                         </ul>
                     </div>
 
-                    <div class="bg-gray-50 p-3 text-center border-t border-gray-100">
-                        <a href="#" class="text-xs text-gray-400 hover:text-gray-600 transition-colors">Ver más en ${nombreTienda}</a>
-                    </div>
+                    <a href="#" class="block bg-gray-50 p-3 text-center border-t border-gray-100 text-xs text-gray-400 font-medium hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                        Ver sitio web
+                    </a>
                 </div>
                 `;
 

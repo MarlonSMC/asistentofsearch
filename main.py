@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 import electronilab
 import vistronica
+import zamux
 
 # Inicialización de la aplicación FastAPI
 app = FastAPI()
@@ -28,9 +29,8 @@ async def home(request: Request):
 async def chat(data: ChatRequest):
     query = data.message
     
-    # 1. Ejecutar búsquedas
+    # 1. Ejecutar búsquedas (Ahora son 3 tiendas)
     try:
-        # Buscamos hasta 10 para tener variedad en la lista
         productos_vistronica = vistronica.buscar_productos(query, limite=10)
     except:
         productos_vistronica = []
@@ -40,25 +40,33 @@ async def chat(data: ChatRequest):
     except:
         productos_electronilab = []
 
+    try:
+        # --- NUEVA TIENDA ---
+        productos_zamux = zamux.buscar_productos(query, limite=10)
+    except:
+        productos_zamux = []
+
     # 2. Construir respuesta agrupada por Tienda
-    # Ya no mezclamos las listas, las mantenemos separadas
     resultados_agrupados = {
         "Vistronica": productos_vistronica,
-        "Electronilab": productos_electronilab
+        "Electronilab": productos_electronilab,
+        "Zamux": productos_zamux  # <--- AGREGAR AQUÍ
     }
 
     # 3. Mensaje resumen
     count_v = len(productos_vistronica)
     count_e = len(productos_electronilab)
+    count_z = len(productos_zamux) # Contar Zamux
+    total = count_v + count_e + count_z
     
-    if count_v + count_e > 0:
-        reply = f"Resultados para '{query}': {count_v} en Vistronica y {count_e} en Electronilab."
+    if total > 0:
+        reply = f"Encontré {total} resultados: {count_v} en Vistronica, {count_e} en Electronilab y {count_z} en Zamux."
     else:
         reply = f"No encontré nada relacionado con '{query}' en las tiendas."
 
     return {
         "reply": reply,
-        "results": resultados_agrupados # Objeto { "Tienda A": [...], "Tienda B": [...] }
+        "results": resultados_agrupados
     }
 
 if __name__ == '__main__':
