@@ -1,4 +1,4 @@
-# Usamos una imagen ligera de Python basada en Linux
+﻿# Usamos una imagen ligera de Python basada en Linux
 FROM python:3.9-slim
 
 # Directorio de trabajo dentro del contenedor
