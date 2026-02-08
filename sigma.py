@@ -1,182 +1,105 @@
 import requests
-import json
+from bs4 import BeautifulSoup
 import re
-import time
 
-# URL del archivo maestro de Sigma
-DB_URL = "https://www.sigmaelectronica.net/wp-content/uploads/woos_search_engine_cache/guaven_woos_data.js"
-CACHE_DURATION = 86400  # 24 horas
-
-SIGMA_CACHE = {
-    "data": [], 
-    "last_updated": 0
-}
-
-def actualizar_bd():
-    global SIGMA_CACHE
-    ahora = time.time()
+def buscar_productos(query, limite=10):
+    # Búsqueda directa en el buscador de WordPress/WooCommerce de Sigma
+    url = f"https://www.sigmaelectronica.net/?s={query}&post_type=product"
     
-    if SIGMA_CACHE["data"] and (ahora - SIGMA_CACHE["last_updated"] < CACHE_DURATION):
-        return True
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Referer": "https://www.sigmaelectronica.net/"
+    }
 
-    print("--- Cargando Motor de Búsqueda Sigma ---")
     try:
-        response = requests.get(DB_URL, timeout=30)
-        if response.status_code != 200: return False
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code != 200:
+            return []
 
-        content = response.text
-        start = content.find('{')
-        end = content.rfind('}') + 1
-        data = json.loads(content[start:end])
-        
-        keywords_list = data.get("guaven_woos_cache_keywords", [])
-        html_list = data.get("guaven_woos_cache_html", [])
-        
-        procesados = []
-        # Las listas son paralelas: indice 0 con 0, 1 con 1...
-        total = min(len(keywords_list), len(html_list))
-        
-        for i in range(total):
-            k_str = keywords_list[i]
-            h_str = html_list[i]
-            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        productos = []
+
+        # Sigma usa WooCommerce. Los productos suelen estar en 'li.product' o 'div.product'
+        # Buscamos contenedores que tengan la clase 'type-product'
+        items = soup.select('.product, .type-product')
+
+        for item in items:
             try:
-                # --- 1. EXTRACCIÓN DE DATOS ---
-                # Formato típico: "SKU {{k}} ... {{o}}"> Título Descripción"
+                # 1. TÍTULO Y URL
+                tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
+                tag_link = item.select_one('a.woocommerce-LoopProduct-link, a')
                 
-                # SKU (Lo que está antes de {{k}})
-                sku = ""
-                if '{{k}}' in k_str:
-                    sku = k_str.split('{{k}}')[0].strip()
+                if not tag_titulo or not tag_link: continue
 
-                # CONTENIDO (Lo que está después de {{o}}">)
-                raw_content = ""
-                if '{{o}}">' in k_str:
-                    raw_content = k_str.split('{{o}}">', 1)[1].strip()
-                else:
-                    raw_content = k_str # Fallback
+                nombre = tag_titulo.get_text(strip=True)
+                url_producto = tag_link['href']
 
-                # TÍTULO (Heurística: Primera frase hasta punto o guion)
-                titulo = raw_content.split('.')[0].split('–')[0].strip()
-                if len(titulo) > 80: titulo = titulo[:80]
-
-                # PRECIO E IMAGEN
+                # 2. PRECIO
+                # Buscamos el precio actual (a veces hay oferta y precio regular)
+                tag_precio = item.select_one('.price')
                 precio = "Consultar"
-                match_p = re.search(r"\{\{p\}\}([0-9.,]+)", h_str)
-                if match_p: precio = "$ " + match_p.group(1)
+                
+                if tag_precio:
+                    # Si hay oferta, el precio real suele estar dentro de <ins> o al final
+                    # Extraemos el texto limpio
+                    texto_precio = tag_precio.get_text(" ", strip=True)
+                    # Buscamos el patrón de dinero: $ 15.000 o $15,000
+                    match = re.findall(r'[\$][\s\d,.]+', texto_precio)
+                    if match:
+                        precio = match[-1] # Tomamos el último (el de oferta si hay dos)
+                    else:
+                        precio = texto_precio
 
+                # 3. IMAGEN
+                tag_img = item.select_one('img')
                 imagen = "https://via.placeholder.com/150?text=Sigma"
-                match_img = re.search(r'\{\{d\}\}\{\{u\}\}/([^"]+?)\{\{i\}\}', h_str)
-                if match_img:
-                    imagen = f"https://www.sigmaelectronica.net/wp-content/uploads/{match_img.group(1)}"
+                
+                if tag_img:
+                    src = tag_img.get('src')
+                    if not src and tag_img.get('data-src'):
+                        src = tag_img.get('data-src')
+                    
+                    if src: imagen = src
 
-                # ID (Vital para el link)
-                pid = None
-                match_id = re.search(r'id="prli_(\d+)"', h_str)
-                if match_id: pid = match_id.group(1)
+                # 4. STOCK (NUEVO: Lectura directa)
+                # Sigma suele mostrar "Hay 5 disponibles" en el listado
+                stock = "Disponible"
+                texto_item = item.get_text(" ", strip=True)
+                
+                # Buscamos patrón "Hay X disponibles"
+                match_stock = re.search(r'Hay\s*(\d+)\s*disponibles', texto_item, re.IGNORECASE)
+                if match_stock:
+                    cantidad = match_stock.group(1)
+                    stock = f"{cantidad} unid."
+                elif "agotado" in texto_item.lower() or "out of stock" in texto_item.lower():
+                    stock = "Agotado"
 
-                if pid:
-                    procesados.append({
-                        "id": pid,
-                        "sku": sku,
-                        "titulo": titulo,
-                        "contenido_completo": k_str.lower(), # Para búsqueda sucia
-                        "titulo_lower": titulo.lower(),      # Para relevancia alta
-                        "sku_lower": sku.lower(),            # Para relevancia máxima
-                        "precio": precio,
-                        "imagen": imagen,
-                        "url": f"https://www.sigmaelectronica.net/?p={pid}",
-                        "tienda": "Sigma",
-                        "stock": "Disponible"
-                    })
-            except:
+                productos.append({
+                    "nombre": nombre,
+                    "precio": precio,
+                    "url": url_producto,
+                    "imagen": imagen,
+                    "tienda": "Sigma",
+                    "stock": stock
+                })
+                
+                if len(productos) >= limite:
+                    break
+
+            except Exception as e:
                 continue
 
-        SIGMA_CACHE["data"] = procesados
-        SIGMA_CACHE["last_updated"] = ahora
-        print(f"Sigma Indexado: {len(procesados)} productos.")
-        return True
+        return productos
 
     except Exception as e:
-        print(f"Error Sigma: {e}")
-        return False
-
-def buscar_productos(query: str, limite: int = 10):
-    if not actualizar_bd():
+        print(f"Error en Sigma: {e}")
         return []
-
-    q_norm = query.lower().strip()
-    palabras = q_norm.split()
-    
-    resultados_con_puntaje = []
-    
-    for prod in SIGMA_CACHE["data"]:
-        score = 0
-        
-        # --- ALGORITMO DE RELEVANCIA (SCORING) ---
-        
-        # 1. Coincidencia EXACTA en SKU (Máxima prioridad)
-        if q_norm == prod["sku_lower"]:
-            score += 1000
-        elif q_norm in prod["sku_lower"]:
-            score += 500
-
-        # 2. Coincidencia en TÍTULO (Alta prioridad)
-        # Verificamos si TODAS las palabras están en el título
-        match_titulo = True
-        for p in palabras:
-            if p not in prod["titulo_lower"]:
-                match_titulo = False
-                break
-        
-        if match_titulo:
-            score += 100
-            # Bono si empieza con la palabra buscada (Ej: "Arduino Uno" vs "Cable Arduino")
-            if prod["titulo_lower"].startswith(palabras[0]):
-                score += 50
-
-        # 3. Coincidencia en DESCRIPCIÓN (Baja prioridad)
-        # Solo si no hubo match en título, miramos el resto
-        if score == 0:
-            match_desc = True
-            for p in palabras:
-                if p not in prod["contenido_completo"]:
-                    match_desc = False
-                    break
-            
-            if match_desc:
-                score += 10 # Puntos bajos para accesorios
-
-        # --- FILTRO FINAL ---
-        # Solo agregamos si tiene algún puntaje
-        if score > 0:
-            resultados_con_puntaje.append((score, prod))
-
-    # ORDENAR POR PUNTAJE (De mayor a menor)
-    # Esto pone los Arduinos reales arriba y los cables abajo
-    resultados_con_puntaje.sort(key=lambda x: x[0], reverse=True)
-    
-    # Formatear salida
-    finales = []
-    for score, prod in resultados_con_puntaje[:limite]:
-        finales.append({
-            "nombre": prod["titulo"],
-            "precio": prod["precio"],
-            "stock": prod["stock"],
-            "url": prod["url"],
-            "imagen": prod["imagen"],
-            "tienda": "Sigma"
-        })
-
-    return finales
 
 # --- Bloque de Prueba ---
 if __name__ == "__main__":
-    print("Probando Sigma con Ranking...")
-    # Prueba difícil: "Arduino"
-    # Debería salir primero la placa, no el cable.
-    res = buscar_productos("arduino")
-    
-    print(f"\nResultados encontrados: {len(res)}")
-    for i, r in enumerate(res):
-        print(f"{i+1}. {r['nombre']} ({r['precio']})")
+    print("Probando Sigma (Método Directo)...")
+    res = buscar_productos("arduino", limite=5)
+    print(f"Encontrados: {len(res)}")
+    for p in res:
+        print(f"[{p['stock']}] {p['nombre']} - {p['precio']}")
