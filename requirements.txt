@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-jinja2
 requests
-cloudscraper
 beautifulsoup4
+lxml
