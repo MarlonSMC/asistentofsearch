@@ -4,7 +4,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+import arcaelectronica
 import electronilab
+import electrosena
+import jabots
+import mactronica
+import plugandplay
+import sigma
 import vistronica
 import zamux
 
@@ -46,21 +52,76 @@ async def chat(data: ChatRequest):
     except:
         productos_zamux = []
 
-    # 2. Construir respuesta agrupada por Tienda
+    try:
+        productos_sigma = sigma.buscar_productos(query, limite=10)
+        print(f"Sigma: Encontrados {len(productos_sigma)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Sigma: {e}")
+        productos_sigma = []
+
+    try:
+        productos_mactronica = mactronica.buscar_productos(query, limite=10)
+        print(f"Mactronica: Encontrados {len(productos_mactronica)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Mactronica: {e}")
+        productos_mactronica = []
+
+    try:
+        productos_arcaelectronica = arcaelectronica.buscar_productos(query, limite=10)
+        print(f"Arca Electrónica: Encontrados {len(productos_arcaelectronica)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Arca Electrónica: {e}")
+        productos_arcaelectronica = []
+    
+    try:
+        productos_plugandplay = plugandplay.buscar_productos(query, limite=10)
+        print(f"Electrónica Plug and Play: Encontrados {len(productos_plugandplay)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Electrónica Plug and Play: {e}")
+        productos_plugandplay = []
+    
+    try:
+        productos_electrosena = electrosena.buscar_productos(query, limite=10)
+        print(f"Electrónica Plug and Play: Encontrados {len(productos_electrosena)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Electrónica Plug and Play: {e}")
+        productos_electrosena = []
+    
+    try:
+        productos_jabots = jabots.buscar_productos(query, limite=10)
+        print(f"Ja-Bots: Encontrados {len(productos_jabots)} productos para '{query}'")
+    except Exception as e:
+        print(f"Error Ja-Bots: {e}")
+        productos_jabots = []
+        
+    # Agrupar resultados
     resultados_agrupados = {
         "Vistronica": productos_vistronica,
         "Electronilab": productos_electronilab,
-        "Zamux": productos_zamux  # <--- AGREGAR AQUÍ
+        "Zamux": productos_zamux,
+        "Sigma": productos_sigma,
+        "Mactronica": productos_mactronica,
+        "Arca Electrónica": productos_arcaelectronica,
+        "Electrónica Plug and Play": productos_plugandplay,
+        "Electrosena": productos_electrosena,
+        "Ja-Bots": productos_jabots
     }
 
     # 3. Mensaje resumen
-    count_v = len(productos_vistronica)
-    count_e = len(productos_electronilab)
-    count_z = len(productos_zamux) # Contar Zamux
-    total = count_v + count_e + count_z
+    count_vistronica = len(productos_vistronica)
+    count_electronilab = len(productos_electronilab)
+    count_zamux = len(productos_zamux)
+    count_sigma = len(productos_sigma)
+    count_magtronica = len(productos_mactronica)
+    count_arcaelectronica = len(productos_arcaelectronica)
+    count_plugandplay = len(productos_plugandplay)
+    count_electrosena = len(productos_electrosena)
+    count_jabots = len(productos_jabots)
+    
+    total = count_vistronica + count_electronilab + count_zamux + count_sigma + count_magtronica + count_arcaelectronica + count_plugandplay + count_electrosena + count_jabots
     
     if total > 0:
-        reply = f"Encontré {total} resultados: {count_v} en Vistronica, {count_e} en Electronilab y {count_z} en Zamux."
+        reply = f"Encontré {total} resultados: {count_vistronica} en Vistronica, {count_electronilab} en Electronilab, {count_zamux} en Zamux, {count_sigma} en Sigma, {count_magtronica} en Mactronica, {count_arcaelectronica} en Arca Electrónica, {count_plugandplay} en Electrónica Plug and Play y {count_electrosena} en Electrosena y {count_jabots} en Ja-Bots."
     else:
         reply = f"No encontré nada relacionado con '{query}' en las tiendas."
 
