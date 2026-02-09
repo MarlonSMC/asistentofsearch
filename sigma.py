@@ -12,42 +12,53 @@ def buscar_productos(query, limite=10):
         "Referer": "https://www.sigmaelectronica.net/"
     }
 
+    print(f"--- SIGMA DEBUG: Iniciando búsqueda de '{query}' ---") # DEBUG
+    print(f"--- SIGMA DEBUG: URL: {url} ---") # DEBUG
+
     try:
         response = requests.get(url, headers=headers, timeout=15)
+        print(f"--- SIGMA DEBUG: Status Code: {response.status_code} ---") # DEBUG
+        
         if response.status_code != 200:
+            print(f"--- SIGMA DEBUG: Error en conexión. Status no es 200. ---") # DEBUG
             return []
+
+        print(f"--- SIGMA DEBUG: Descarga exitosa. Tamaño HTML: {len(response.text)} caracteres ---") # DEBUG
 
         soup = BeautifulSoup(response.text, 'html.parser')
         productos = []
 
-        # Sigma usa WooCommerce. Los productos suelen estar en 'li.product' o 'div.product'
-        # Buscamos contenedores que tengan la clase 'type-product'
+        # Sigma usa WooCommerce. Buscamos contenedores 'type-product'
         items = soup.select('.product, .type-product')
+        print(f"--- SIGMA DEBUG: Elementos '.product' encontrados: {len(items)} ---") # DEBUG
 
-        for item in items:
+        if len(items) == 0:
+             print("--- SIGMA DEBUG: ALERTA - No se encontraron productos en el HTML. Posible cambio de estructura o bloqueo antibot. ---") # DEBUG
+             # Opcional: Imprimir un pedazo del HTML para ver qué devolvieron
+             # print(response.text[:500]) 
+
+        for i, item in enumerate(items):
             try:
                 # 1. TÍTULO Y URL
                 tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
                 tag_link = item.select_one('a.woocommerce-LoopProduct-link, a')
                 
-                if not tag_titulo or not tag_link: continue
+                if not tag_titulo or not tag_link: 
+                    print(f"--- SIGMA DEBUG: Item {i} saltado (sin título o link) ---") # DEBUG
+                    continue
 
                 nombre = tag_titulo.get_text(strip=True)
                 url_producto = tag_link['href']
 
                 # 2. PRECIO
-                # Buscamos el precio actual (a veces hay oferta y precio regular)
                 tag_precio = item.select_one('.price')
                 precio = "Consultar"
                 
                 if tag_precio:
-                    # Si hay oferta, el precio real suele estar dentro de <ins> o al final
-                    # Extraemos el texto limpio
                     texto_precio = tag_precio.get_text(" ", strip=True)
-                    # Buscamos el patrón de dinero: $ 15.000 o $15,000
                     match = re.findall(r'[\$][\s\d,.]+', texto_precio)
                     if match:
-                        precio = match[-1] # Tomamos el último (el de oferta si hay dos)
+                        precio = match[-1]
                     else:
                         precio = texto_precio
 
@@ -59,15 +70,12 @@ def buscar_productos(query, limite=10):
                     src = tag_img.get('src')
                     if not src and tag_img.get('data-src'):
                         src = tag_img.get('data-src')
-                    
                     if src: imagen = src
 
-                # 4. STOCK (NUEVO: Lectura directa)
-                # Sigma suele mostrar "Hay 5 disponibles" en el listado
+                # 4. STOCK
                 stock = "Disponible"
                 texto_item = item.get_text(" ", strip=True)
                 
-                # Buscamos patrón "Hay X disponibles"
                 match_stock = re.search(r'Hay\s*(\d+)\s*disponibles', texto_item, re.IGNORECASE)
                 if match_stock:
                     cantidad = match_stock.group(1)
@@ -88,12 +96,14 @@ def buscar_productos(query, limite=10):
                     break
 
             except Exception as e:
+                print(f"--- SIGMA DEBUG: Error procesando item {i}: {e} ---") # DEBUG
                 continue
 
+        print(f"--- SIGMA DEBUG: Total productos procesados exitosamente: {len(productos)} ---") # DEBUG
         return productos
 
     except Exception as e:
-        print(f"Error en Sigma: {e}")
+        print(f"--- SIGMA DEBUG: Error CRÍTICO en Sigma: {e} ---") # DEBUG
         return []
 
 # --- Bloque de Prueba ---
