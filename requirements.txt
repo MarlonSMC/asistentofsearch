@@ -4,3 +4,5 @@ requests
 beautifulsoup4
 cloudscraper
 jinja2
+playwright
+playwright-stealth

@@ -1,127 +1,123 @@
-import cloudscraper
+from playwright.sync_api import sync_playwright
+from playwright_stealth import stealth_sync
 from bs4 import BeautifulSoup
 import re
-import sys
+import time
+import random
 
 def buscar_productos(query, limite=10):
     url = f"https://www.sigmaelectronica.net/?s={query}&post_type=product"
     
-    # Simulación de un navegador moderno para evitar bloqueos
-    scraper = cloudscraper.create_scraper(
-        browser={
-            'browser': 'chrome',
-            'platform': 'windows',
-            'desktop': True
-        }
-    )
-    # Y añade headers manuales
-    scraper.headers.update({
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Referer': 'https://www.google.com/'
-    })
-
-    print(f"--- DEBUG SIGMA: Iniciando búsqueda para '{query}' ---")
-    print(f"--- DEBUG SIGMA: URL: {url} ---")
-
-    try:
-        response = scraper.get(url, timeout=20)
+    print(f"--- PLAYWRIGHT: Iniciando búsqueda para '{query}' ---")
+    
+    # Iniciamos Playwright
+    with sync_playwright() as p:
+        # Lanzamos navegador. 
+        # En GCP/Docker es CRÍTICO usar los args '--no-sandbox'
+        browser = p.chromium.launch(
+            headless=True, 
+            args=['--no-sandbox', '--disable-setuid-sandbox'] 
+        )
         
-        # LOG: Estado de la respuesta
-        print(f"--- DEBUG SIGMA: Status Code: {response.status_code} ---")
+        # Contexto persistente (simula un perfil de usuario)
+        context = browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            viewport={'width': 1920, 'height': 1080}
+        )
         
-        if response.status_code != 200:
-            print(f"--- DEBUG SIGMA: Error de acceso. HTML recibido (primeros 500 chars): ---")
-            print(response.text[:500])
-            return []
-
-        soup = BeautifulSoup(response.text, 'html.parser')
+        page = context.new_page()
         
-        # LOG: Verificar si el HTML contiene indicios de bloqueo (Cloudflare)
-        if "cf-ray" in response.text.lower() or "checking your browser" in response.text.lower():
-            print("--- DEBUG SIGMA: ¡BLOQUEO DETECTADO! Cloudflare está pidiendo verificación humana (JS Challenge).")
-            return []
+        # --- APLICAR STEALTH ---
+        # Esto elimina variables como 'navigator.webdriver' que delatan al bot
+        stealth_sync(page)
 
-        productos = []
-
-        # Intentamos identificar qué selectores están disponibles
-        items = soup.select('.product, .type-product')
-        print(f"--- DEBUG SIGMA: Se encontraron {len(items)} elementos con clase '.product' o '.type-product' ---")
-
-        if len(items) == 0:
-            # Si no hay items, imprimimos las clases de los primeros <div> para diagnosticar el DOM
-            print("--- DEBUG SIGMA: No se hallaron productos. Estructura de clases detectada en el body: ---")
-            for div in soup.find_all('div', limit=5):
-                print(f"Div class: {div.get('class')}")
-
-        for i, item in enumerate(items):
+        try:
+            print(f"--- PLAYWRIGHT: Navegando a {url} ---")
+            page.goto(url, timeout=60000, wait_until='domcontentloaded')
+            
+            # Pequeña espera aleatoria para parecer humano
+            time.sleep(random.uniform(2, 4))
+            
+            # Esperamos a que aparezca al menos un producto O el mensaje de 'no encontrado'
+            # Esto da tiempo a que JS se ejecute y pase el challenge si es ligero.
             try:
-                # DEBUG SELECTORES
-                tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
-                tag_link = item.select_one('a.woocommerce-LoopProduct-link, a')
-                
-                if not tag_titulo:
-                    print(f"--- DEBUG SIGMA [Item {i}]: No se encontró tag_titulo ---")
-                if not tag_link:
-                    print(f"--- DEBUG SIGMA [Item {i}]: No se encontró tag_link ---")
-                
-                if not tag_titulo or not tag_link: continue
+                page.wait_for_selector('.product, .woocommerce-info', timeout=15000)
+            except Exception:
+                print("--- PLAYWRIGHT: Timeout esperando selector. Posible bloqueo fuerte o carga lenta.")
 
-                nombre = tag_titulo.get_text(strip=True)
-                url_producto = tag_link['href']
+            # Extraemos el HTML renderizado (ya procesado por el navegador)
+            contenido_html = page.content()
+            
+            # --- DEBUG: Ver si seguimos bloqueados ---
+            if "recaptcha" in contenido_html.lower() or "challenge" in contenido_html.lower():
+                print("--- ALERTA: El HTML aún contiene rastros de ReCAPTCHA/Challenge ---")
 
-                # 2. PRECIO
-                tag_precio = item.select_one('.price')
-                precio = "Consultar"
-                
-                if tag_precio:
-                    texto_precio = tag_precio.get_text(" ", strip=True)
-                    match = re.findall(r'[\$][\s\d,.]+', texto_precio)
-                    precio = match[-1] if match else texto_precio
-                else:
-                    print(f"--- DEBUG SIGMA [Item {i}]: Precio no encontrado para {nombre} ---")
+            # --- PARSING (Tu lógica original con BS4) ---
+            soup = BeautifulSoup(contenido_html, 'html.parser')
+            items = soup.select('.product, .type-product')
+            print(f"--- PLAYWRIGHT: Items encontrados en el DOM: {len(items)} ---")
+            
+            productos = []
+            
+            for item in items:
+                try:
+                    tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
+                    tag_link = item.select_one('a.woocommerce-LoopProduct-link, a')
+                    
+                    if not tag_titulo or not tag_link: continue
 
-                # 3. IMAGEN
-                tag_img = item.select_one('img')
-                imagen = "https://via.placeholder.com/150?text=Sigma"
-                if tag_img:
-                    src = tag_img.get('src') or tag_img.get('data-src')
-                    if src: imagen = src
+                    nombre = tag_titulo.get_text(strip=True)
+                    url_producto = tag_link['href']
 
-                # 4. STOCK
-                stock = "Disponible"
-                texto_item = item.get_text(" ", strip=True)
-                match_stock = re.search(r'Hay\s*(\d+)\s*disponibles', texto_item, re.IGNORECASE)
-                
-                if match_stock:
-                    stock = f"{match_stock.group(1)} unid."
-                elif "agotado" in texto_item.lower() or "out of stock" in texto_item.lower():
-                    stock = "Agotado"
+                    # Precio
+                    tag_precio = item.select_one('.price')
+                    precio = "Consultar"
+                    if tag_precio:
+                        texto_precio = tag_precio.get_text(" ", strip=True)
+                        match = re.findall(r'[\$][\s\d,.]+', texto_precio)
+                        precio = match[-1] if match else texto_precio
 
-                productos.append({
-                    "nombre": nombre,
-                    "precio": precio,
-                    "url": url_producto,
-                    "imagen": imagen,
-                    "tienda": "Sigma",
-                    "stock": stock
-                })
-                
-                if len(productos) >= limite:
-                    break
+                    # Imagen
+                    tag_img = item.select_one('img')
+                    imagen = "https://via.placeholder.com/150?text=Sigma"
+                    if tag_img:
+                        src = tag_img.get('src') or tag_img.get('data-src')
+                        if src: imagen = src
 
-            except Exception as e:
-                print(f"--- DEBUG SIGMA: Error procesando item {i}: {e} ---")
-                continue
+                    # Stock (Lógica Regex)
+                    stock = "Disponible"
+                    texto_item = item.get_text(" ", strip=True)
+                    match_stock = re.search(r'Hay\s*(\d+)\s*disponibles', texto_item, re.IGNORECASE)
+                    
+                    if match_stock:
+                        stock = f"{match_stock.group(1)} unid."
+                    elif "agotado" in texto_item.lower() or "out of stock" in texto_item.lower():
+                        stock = "Agotado"
 
-        print(f"--- DEBUG SIGMA: Total productos extraídos: {len(productos)} ---")
-        return productos
+                    productos.append({
+                        "nombre": nombre,
+                        "precio": precio,
+                        "url": url_producto,
+                        "imagen": imagen,
+                        "tienda": "Sigma",
+                        "stock": stock
+                    })
+                    
+                    if len(productos) >= limite: break
 
-    except Exception as e:
-        print(f"--- DEBUG SIGMA: ERROR CRÍTICO: {type(e).__name__} - {e} ---")
-        return []
+                except Exception:
+                    continue
+
+            browser.close()
+            return productos
+
+        except Exception as e:
+            print(f"Error crítico Playwright: {e}")
+            browser.close()
+            return []
 
 if __name__ == "__main__":
+    # Prueba local
     res = buscar_productos("arduino", limite=5)
     for p in res:
         print(f"[{p['stock']}] {p['nombre']} - {p['precio']}")
