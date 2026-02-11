@@ -1,51 +1,38 @@
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 import re
 
 def buscar_productos(query, limite=10):
-    # Búsqueda directa en el buscador de WordPress/WooCommerce de Sigma
+    # URL de búsqueda
     url = f"https://www.sigmaelectronica.net/?s={query}&post_type=product"
     
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Referer": "https://www.sigmaelectronica.net/"
-    }
+    # Creamos un scraper que simula ser un navegador (Chrome)
+    scraper = cloudscraper.create_scraper()
 
-    print(f"--- SIGMA DEBUG: Iniciando búsqueda de '{query}' ---") # DEBUG
-    print(f"--- SIGMA DEBUG: URL: {url} ---") # DEBUG
+    print(f"--- SIGMA (CloudScraper): Buscando '{query}' ---")
 
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        print(f"--- SIGMA DEBUG: Status Code: {response.status_code} ---") # DEBUG
+        # Usamos scraper.get en lugar de requests.get
+        response = scraper.get(url, timeout=20)
         
         if response.status_code != 200:
-            print(f"--- SIGMA DEBUG: Error en conexión. Status no es 200. ---") # DEBUG
+            print(f"--- SIGMA Error: Status {response.status_code} ---")
             return []
-
-        print(f"--- SIGMA DEBUG: Descarga exitosa. Tamaño HTML: {len(response.text)} caracteres ---") # DEBUG
 
         soup = BeautifulSoup(response.text, 'html.parser')
         productos = []
 
-        # Sigma usa WooCommerce. Buscamos contenedores 'type-product'
+        # Buscamos los productos (clases estándar de WooCommerce)
         items = soup.select('.product, .type-product')
-        print(f"--- SIGMA DEBUG: Elementos '.product' encontrados: {len(items)} ---") # DEBUG
+        print(f"--- SIGMA: Encontrados {len(items)} items ---")
 
-        if len(items) == 0:
-             print("--- SIGMA DEBUG: ALERTA - No se encontraron productos en el HTML. Posible cambio de estructura o bloqueo antibot. ---") # DEBUG
-             # Opcional: Imprimir un pedazo del HTML para ver qué devolvieron
-             # print(response.text[:500]) 
-
-        for i, item in enumerate(items):
+        for item in items:
             try:
                 # 1. TÍTULO Y URL
                 tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
                 tag_link = item.select_one('a.woocommerce-LoopProduct-link, a')
                 
-                if not tag_titulo or not tag_link: 
-                    print(f"--- SIGMA DEBUG: Item {i} saltado (sin título o link) ---") # DEBUG
-                    continue
+                if not tag_titulo or not tag_link: continue
 
                 nombre = tag_titulo.get_text(strip=True)
                 url_producto = tag_link['href']
@@ -67,9 +54,7 @@ def buscar_productos(query, limite=10):
                 imagen = "https://via.placeholder.com/150?text=Sigma"
                 
                 if tag_img:
-                    src = tag_img.get('src')
-                    if not src and tag_img.get('data-src'):
-                        src = tag_img.get('data-src')
+                    src = tag_img.get('src') or tag_img.get('data-src')
                     if src: imagen = src
 
                 # 4. STOCK
@@ -95,21 +80,18 @@ def buscar_productos(query, limite=10):
                 if len(productos) >= limite:
                     break
 
-            except Exception as e:
-                print(f"--- SIGMA DEBUG: Error procesando item {i}: {e} ---") # DEBUG
+            except Exception:
                 continue
 
-        print(f"--- SIGMA DEBUG: Total productos procesados exitosamente: {len(productos)} ---") # DEBUG
         return productos
 
     except Exception as e:
-        print(f"--- SIGMA DEBUG: Error CRÍTICO en Sigma: {e} ---") # DEBUG
+        print(f"Error crítico en Sigma: {e}")
         return []
 
-# --- Bloque de Prueba ---
+# --- Bloque de Prueba Local ---
 if __name__ == "__main__":
-    print("Probando Sigma (Método Directo)...")
+    print("Probando Sigma con CloudScraper...")
     res = buscar_productos("arduino", limite=5)
-    print(f"Encontrados: {len(res)}")
     for p in res:
-        print(f"[{p['stock']}] {p['nombre']} - {p['precio']}")
+        print(f"[{p['stock']}] {p['nombre']}")
