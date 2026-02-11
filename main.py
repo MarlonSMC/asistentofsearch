@@ -37,7 +37,7 @@ async def chat(data: ChatRequest):
     
     # 1. Ejecutar búsquedas (Ahora son 3 tiendas)
     try:
-        productos_vistronica = vistronica.buscar_productos(query, limite=10)
+        productos_vistronica = await vistronica.buscar_productos(query, limite=10)
     except:
         productos_vistronica = []
 

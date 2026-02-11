@@ -6,3 +6,5 @@ cloudscraper
 jinja2
 playwright
 playwright-stealth
+httpx
+unidecode
