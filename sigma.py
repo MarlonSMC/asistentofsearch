@@ -14,6 +14,12 @@ def buscar_productos(query, limite=10):
             'desktop': True
         }
     )
+    # Y añade headers manuales
+    scraper.headers.update({
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
+        'Referer': 'https://www.google.com/'
+    })
 
     print(f"--- DEBUG SIGMA: Iniciando búsqueda para '{query}' ---")
     print(f"--- DEBUG SIGMA: URL: {url} ---")
