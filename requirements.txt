@@ -2,8 +2,5 @@
 uvicorn
 requests
 beautifulsoup4
-lxml
 cloudscraper
 jinja2
-aiofiles
-python-multipart
