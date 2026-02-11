@@ -6,107 +6,332 @@
     <title>Asistent Of Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;700&display=swap');
+        :root {
+            --bg-start: #05070f;
+            --bg-end: #11172a;
+            --neon-cyan: #78ecff;
+            --neon-blue: #63d2ff;
+            --neon-purple: #ca76ff;
+            --panel: rgba(7, 10, 24, 0.82);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
 
         body {
-            font-family: 'Product Sans', Arial, sans-serif;
-            /* Prevenir rebote de scroll en iOS */
-            overscroll-behavior-y: none;
+            margin: 0;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            color: #e8ecff;
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 10%, #1a2140 0%, transparent 35%),
+                        radial-gradient(circle at 80% 20%, #2a1548 0%, transparent 35%),
+                        linear-gradient(180deg, var(--bg-start), var(--bg-end));
+            overflow-x: hidden;
         }
 
-        /* Animación de carga mejorada */
-        .dot-flashing {
+        .app-shell {
+            min-height: 100vh;
             position: relative;
-            width: 8px;
-            height: 8px;
-            border-radius: 4px;
-            background-color: #3b82f6;
-            animation: dot-flashing 1s infinite linear alternate;
-            animation-delay: .5s;
+            padding: 24px 14px 40px;
         }
-        .dot-flashing::before, .dot-flashing::after {
-            content: '';
-            display: inline-block;
+
+        .search-stage {
+            position: fixed;
+            left: 50%;
+            top: 38vh;
+            transform: translate(-50%, -50%);
+            width: min(760px, 94vw);
+            z-index: 50;
+            transition: top .8s ease, width .8s ease, transform .8s ease;
+        }
+
+        .stage-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            transition: gap .4s ease;
+        }
+
+        .logo-wrapper {
+            position: relative;
+            width: clamp(150px, 22vw, 210px);
+            aspect-ratio: 1;
+            display: grid;
+            place-items: center;
+            transition: transform .8s ease;
+        }
+
+        .logo-ring {
             position: absolute;
-            top: 0;
-            width: 8px;
-            height: 8px;
-            border-radius: 4px;
-            background-color: #3b82f6;
-            animation: dot-flashing 1s infinite alternate;
-        }
-        .dot-flashing::before { left: -12px; animation-delay: 0s; }
-        .dot-flashing::after { left: 12px; animation-delay: 1s; }
-
-        @keyframes dot-flashing {
-            0% { background-color: #3b82f6; }
-            50%, 100% { background-color: #e5e7eb; }
+            inset: 0;
+            border-radius: 999px;
+            background: conic-gradient(from 0deg, #5fd7ff, #87f0ff, #7ea9ff, #c26eff, #ff8fea, #5fd7ff);
+            filter: drop-shadow(0 0 18px rgba(132, 198, 255, .75));
+            mask: radial-gradient(circle, transparent 55%, #000 58%);
+            -webkit-mask: radial-gradient(circle, transparent 55%, #000 58%);
+            opacity: .95;
+            transition: transform .8s ease, opacity .4s ease;
         }
 
-        .bg-gradient-custom {
-            background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f3f4f6 100%);
-            background-attachment: fixed;
+        .logo-gem {
+            position: absolute;
+            width: 38px;
+            height: 38px;
+            transform: rotate(45deg);
+            border: 1px solid rgba(143, 219, 255, .8);
+            background: linear-gradient(135deg, rgba(123, 225, 255, .55), rgba(205, 126, 255, .45));
+            box-shadow: 0 0 14px rgba(132, 198, 255, .6);
         }
-        
-        /* Ocultar barra de scroll en las tarjetas para limpieza visual */
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
+
+        .logo-gem:nth-child(2) { top: -8px; left: 50%; transform: translateX(-50%) rotate(45deg); }
+        .logo-gem:nth-child(3) { top: 19%; right: -4px; }
+        .logo-gem:nth-child(4) { bottom: 19%; right: -4px; }
+        .logo-gem:nth-child(5) { bottom: -8px; left: 50%; transform: translateX(-50%) rotate(45deg); }
+        .logo-gem:nth-child(6) { bottom: 19%; left: -4px; }
+        .logo-gem:nth-child(7) { top: 19%; left: -4px; }
+
+        .logo-core {
+            width: 66%;
+            aspect-ratio: 1;
+            border-radius: 999px;
+            background: radial-gradient(circle at 30% 30%, #223968, #121a35 70%);
+            border: 1px solid rgba(150, 210, 255, .4);
+            display: grid;
+            place-items: center;
+            box-shadow: inset 0 0 24px rgba(148, 199, 255, .28), 0 0 22px rgba(122, 156, 255, .35);
+            z-index: 2;
         }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+
+        .logo-text {
+            font-size: clamp(1.8rem, 5vw, 2.8rem);
+            letter-spacing: .4px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #8cf4ff, #c68bff);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .search-shell {
+            width: min(700px, 92vw);
+            border-radius: 999px;
+            border: 1px solid rgba(140, 201, 255, .36);
+            background: rgba(8, 12, 31, .88);
+            box-shadow: 0 10px 30px rgba(40, 92, 193, .2), inset 0 0 0 1px rgba(255, 255, 255, .08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px 10px 16px;
+            transition: transform .6s ease, opacity .6s ease;
+            transform-origin: center;
+        }
+
+        .search-shell input {
+            flex: 1;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: #eaf6ff;
+            font-size: 1rem;
+        }
+
+        .search-shell input::placeholder { color: #9db2d1; }
+
+        .send-btn {
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #58cfff, #a26eff);
+            color: #031026;
+            font-weight: 700;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: transform .2s ease, filter .2s ease;
+        }
+        .send-btn:hover { filter: brightness(1.08); }
+        .send-btn:active { transform: scale(.97); }
+
+        .status-label {
+            text-transform: uppercase;
+            letter-spacing: .18em;
+            font-size: .72rem;
+            color: rgba(165, 190, 226, .85);
+        }
+
+        .state-idle .search-stage { top: 38vh; }
+
+        .state-consume .search-shell {
+            transform: scaleX(.04);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .state-consume .logo-wrapper { transform: scale(1.18); }
+
+        .state-loading .search-stage { top: 50vh; }
+        .state-loading .search-shell {
+            opacity: 0;
+            transform: scale(.04);
+            pointer-events: none;
+        }
+        .state-loading .logo-wrapper { transform: scale(1.3); }
+        .state-loading .status-label { opacity: 1; }
+        .state-loading .logo-ring { animation: spin-ring 1.1s linear infinite; }
+
+        .state-results .search-stage {
+            top: 20px;
+            transform: translateX(-50%);
+            width: min(1050px, 96vw);
+        }
+        .state-results .stage-content {
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+        .state-results .search-shell {
+            order: 1;
+            flex: 1;
+            max-width: 860px;
+            opacity: 1;
+            transform: scale(1);
+        }
+        .state-results .logo-wrapper {
+            order: 2;
+            width: 96px;
+            transform: scale(.62);
+            transform-origin: center;
+        }
+        .state-results .logo-gem { opacity: .78; }
+
+        @keyframes spin-ring { to { transform: rotate(360deg); } }
+
+        .response-box {
+            margin-top: 170px;
+            background: var(--panel);
+            border: 1px solid rgba(132, 187, 255, .25);
+            border-radius: 16px;
+            padding: 14px 18px;
+            color: #d8e6ff;
+            backdrop-filter: blur(6px);
+        }
+
+        .cards-grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+            padding-bottom: 26px;
+        }
+
+        .store-card {
+            background: rgba(8, 12, 28, .86);
+            border-radius: 14px;
+            border: 1px solid rgba(145, 175, 221, .2);
+            overflow: hidden;
+            box-shadow: 0 12px 28px rgba(1, 4, 14, .45);
+        }
+
+        .store-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            color: white;
+            font-weight: 700;
+        }
+
+        .store-items {
+            max-height: 410px;
+            overflow-y: auto;
+        }
+
+        .store-items li {
+            list-style: none;
+            display: flex;
+            gap: 10px;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(127, 155, 205, .14);
+        }
+
+        .store-items img {
+            width: 46px;
+            height: 46px;
+            border-radius: 8px;
+            object-fit: contain;
+            background: white;
+            padding: 3px;
+        }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 760px) {
+            .state-results .search-stage {
+                top: 10px;
+                width: 98vw;
+            }
+            .state-results .logo-wrapper {
+                width: 78px;
+                transform: scale(.58);
+            }
+            .search-shell { padding: 8px 8px 8px 12px; }
+            .send-btn { padding: 8px 14px; }
+            .response-box { margin-top: 145px; }
         }
     </style>
 </head>
+<body class="state-idle">
+    <div class="app-shell">
+        <header id="searchStage" class="search-stage">
+            <div class="stage-content">
+                <div class="logo-wrapper" aria-label="Logo MarIA">
+                    <div class="logo-ring"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-gem"></div>
+                    <div class="logo-core">
+                        <div class="logo-text">MarIA</div>
+                    </div>
+                </div>
 
-<body class="bg-gradient-custom min-h-screen flex flex-col items-center p-3 md:p-6 pb-20">
+                <div class="search-shell" id="searchShell">
+                    <svg style="width:18px;height:18px;color:#95aed6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="userInput" placeholder="Buscar componente o producto..." autocomplete="off" onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendQuery()">Buscar</button>
+                </div>
 
-    <header class="mt-6 mb-6 md:mt-10 md:mb-8 text-center select-none transition-all duration-500">
-        <h1 class="text-4xl md:text-7xl font-bold tracking-tighter">
-            <span class="text-blue-500">A</span><span class="text-red-500">s</span><span
-                class="text-yellow-500">i</span><span class="text-blue-500">s</span><span
-                class="text-green-500">t</span><span class="text-red-500">e</span><span class="text-gray-700">nt</span>
-        </h1>
-        <p class="text-xs md:text-lg text-gray-400 font-light mt-1 tracking-widest uppercase">Of Search</p>
-    </header>
-
-    <div class="w-full max-w-2xl z-50 sticky top-2 md:top-4">
-        <div class="group relative flex items-center border border-gray-200/80 rounded-full px-4 py-3 md:px-6 md:py-4 shadow-lg shadow-blue-500/5 hover:shadow-xl focus-within:shadow-blue-500/20 focus-within:border-blue-300 transition-all duration-300 bg-white/90 backdrop-blur-md">
-            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            
-            <input type="text" id="userInput" placeholder="Buscar componente..."
-                class="flex-grow outline-none text-base md:text-lg text-gray-700 bg-transparent placeholder-gray-400" 
-                autocomplete="off"
-                onkeypress="handleKeyPress(event)">
-            
-            <button onclick="sendQuery()"
-                class="ml-2 bg-blue-600 hover:bg-blue-700 text-white p-2 md:px-6 md:py-2 rounded-full font-bold transition-all transform active:scale-95 shadow-md flex items-center justify-center">
-                <span class="hidden md:inline">Enviar</span>
-                <svg class="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </button>
-        </div>
-    </div>
-
-    <div id="loadingIndicator" class="hidden mt-6">
-        <div class="dot-flashing"></div>
-    </div>
-
-    <main class="w-full max-w-7xl mt-6 flex-grow">
-        
-        <div id="resultBox" class="hidden mb-6 p-4 bg-white/80 backdrop-blur rounded-2xl border border-gray-100 shadow-sm text-center">
-            <p id="responseText" class="text-gray-800 text-sm md:text-lg font-medium"></p>
-        </div>
-
-        <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 items-start pb-10">
+                <span id="statusLabel" class="status-label hidden">Analizando información…</span>
             </div>
+        </header>
 
-    </main>
-
-    <footer class="py-4 text-gray-300 text-xs text-center">
-        &copy; 2026 Asistent Of Search
-    </footer>
+        <main class="w-full max-w-7xl mx-auto" style="padding-top: 150px;">
+            <div id="resultBox" class="response-box hidden">
+                <p id="responseText" class="m-0 text-sm md:text-base"></p>
+            </div>
+            <div id="cardsContainer" class="cards-grid"></div>
+        </main>
+    </div>
 
     <script>
+        const body = document.body;
+        const statusLabel = document.getElementById('statusLabel');
+
+        function setUiState(state) {
+            body.classList.remove('state-idle', 'state-consume', 'state-loading', 'state-results');
+            body.classList.add(`state-${state}`);
+            if (state === 'loading') {
+                statusLabel.classList.remove('hidden');
+            } else {
+                statusLabel.classList.add('hidden');
+            }
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
         function handleKeyPress(e) {
             if (e.key === 'Enter') sendQuery();
         }
@@ -116,152 +341,85 @@
             const resultBox = document.getElementById('resultBox');
             const responseText = document.getElementById('responseText');
             const cardsContainer = document.getElementById('cardsContainer');
-            const loading = document.getElementById('loadingIndicator');
-            
             const message = input.value.trim();
+
             if (!message) return;
 
-            // UI Reset
-            input.blur(); // Ocultar teclado en móvil
+            input.blur();
+            input.disabled = true;
             resultBox.classList.add('hidden');
             cardsContainer.innerHTML = '';
-            loading.classList.remove('hidden');
-            input.disabled = true;
+
+            setUiState('consume');
+            await wait(430);
+            setUiState('loading');
 
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ message })
                 });
-                
+
                 const data = await response.json();
-                
-                loading.classList.add('hidden');
+                responseText.textContent = data.reply || 'Proceso completado.';
                 resultBox.classList.remove('hidden');
-                responseText.innerText = data.reply || "Hecho.";
+                setUiState('results');
 
-                if (data.results) {
-                    renderCards(data.results);
-                }
-
+                if (data.results) renderCards(data.results);
             } catch (error) {
-                loading.classList.add('hidden');
+                responseText.innerHTML = '<span style="color:#ff8f8f">Error de conexión con el servidor.</span>';
                 resultBox.classList.remove('hidden');
-                responseText.innerHTML = `<span class="text-red-500">Error de conexión</span>`;
+                setUiState('results');
                 console.error(error);
             } finally {
                 input.disabled = false;
-                // No hacemos focus() automático en móvil para no abrir el teclado de nuevo
             }
         }
 
         function renderCards(resultadosAgrupados) {
             const container = document.getElementById('cardsContainer');
-            
+
             for (const [nombreTienda, productos] of Object.entries(resultadosAgrupados)) {
                 if (!productos || productos.length === 0) continue;
 
-                let headerColor, badgeColor, borderColor;
-
-                // Definición de colores
+                let headerColor = '#334155';
                 switch (nombreTienda) {
-                    case 'Vistronica': 
-                        headerColor = 'bg-orange-500';
-                        badgeColor = 'bg-orange-50 text-orange-700 border-orange-100';
-                        borderColor = 'border-orange-100';
-                        break;
-                    case 'Electronilab': 
-                        headerColor = 'bg-blue-600';
-                        badgeColor = 'bg-blue-50 text-blue-700 border-blue-100';
-                        borderColor = 'border-blue-100';
-                        break;
-                    case 'Zamux': 
-                        headerColor = 'bg-[#D2040F]';
-                        badgeColor = 'bg-red-50 text-[#D2040F] border-red-100';
-                        borderColor = 'border-red-100'; // Ajustado a un color Tailwind válido cercano
-                        break;
-                    case 'Sigma': 
-                        headerColor = 'bg-gray-800'; // Color oscuro elegante
-                        badgeColor = 'bg-gray-100 text-gray-800 border-gray-300';
-                        borderColor = 'border-gray-300';
-                        break;
-                    case 'Mactronica': 
-                        headerColor = 'bg-blue-900'; // Azul muy oscuro
-                        badgeColor = 'bg-blue-100 text-blue-900 border-blue-300';
-                        borderColor = 'border-blue-300';
-                        break;
-                    case 'Arca Electrónica': 
-                        headerColor = 'bg-orange-600'; // Color naranja característico de Arca
-                        badgeColor = 'bg-orange-100 text-orange-800 border-orange-200';
-                        borderColor = 'border-orange-200';
-                        break;
-                    case 'Electrónica Plug and Play': 
-                        headerColor = 'bg-teal-600'; // Color turquesa
-                        badgeColor = 'bg-teal-100 text-teal-800 border-teal-200';
-                        borderColor = 'border-teal-200';
-                        break;
-                    case 'Electrosena': 
-                        headerColor = 'bg-purple-600'; 
-                        badgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
-                        borderColor = 'border-purple-200';
-                        break;
-                    case 'Ja-Bots': 
-                        headerColor = 'bg-red-700'; // Rojo oscuro
-                        badgeColor = 'bg-red-100 text-red-800 border-red-200';
-                        borderColor = 'border-red-200';
-                        break;
-                    default: 
-                        headerColor = 'bg-gray-700';
-                        badgeColor = 'bg-gray-100 text-gray-800';
-                        borderColor = 'border-gray-200';
+                    case 'Vistronica': headerColor = '#f97316'; break;
+                    case 'Electronilab': headerColor = '#2563eb'; break;
+                    case 'Zamux': headerColor = '#D2040F'; break;
+                    case 'Sigma': headerColor = '#111827'; break;
+                    case 'Mactronica': headerColor = '#1e3a8a'; break;
+                    case 'Arca Electrónica': headerColor = '#ea580c'; break;
+                    case 'Electrónica Plug and Play': headerColor = '#0d9488'; break;
+                    case 'Electrosena': headerColor = '#9333ea'; break;
+                    case 'Ja-Bots': headerColor = '#b91c1c'; break;
                 }
 
-                // Renderizado de items (Más compacto para móvil)
-                let itemsHTML = productos.map(p => `
-                <li class="flex items-center p-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                    <div class="flex-shrink-0 w-12 h-12 border border-gray-100 rounded-lg overflow-hidden bg-white p-1">
-                        <img src="${p.imagen || 'https://via.placeholder.com/48?text=N/A'}" 
-                             alt="img" class="w-full h-full object-contain" loading="lazy">
-                    </div>
-                    <div class="ml-3 flex-1 min-w-0"> <a href="${p.url}" target="_blank" class="text-sm font-semibold text-gray-900 hover:text-blue-600 truncate block">
-                            ${p.nombre}
-                        </a>
-                        <div class="flex justify-between items-center mt-1">
-                            <span class="text-sm font-bold text-gray-800">${p.precio}</span>
-                            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full border ${p.stock === 'Agotado' ? 'text-red-500 bg-red-50 border-red-100' : 'text-green-600 bg-green-50 border-green-100'}">
-                                ${p.stock || 'Stock?'}
-                            </span>
+                const itemsHTML = productos.map((p) => `
+                    <li>
+                        <img src="${p.imagen || 'https://via.placeholder.com/46?text=N/A'}" alt="img" loading="lazy">
+                        <div style="min-width:0;flex:1;">
+                            <a href="${p.url}" target="_blank" style="display:block;color:#ddebff;font-size:.86rem;font-weight:600;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre}</a>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px;">
+                                <span style="font-size:.85rem;font-weight:700;color:#f1f5ff;">${p.precio}</span>
+                                <span style="font-size:.65rem;padding:2px 8px;border-radius:999px;border:1px solid ${p.stock === 'Agotado' ? '#7f1d1d' : '#14532d'};color:${p.stock === 'Agotado' ? '#fecaca' : '#bbf7d0'};background:${p.stock === 'Agotado' ? 'rgba(127,29,29,.35)' : 'rgba(20,83,45,.35)'};">${p.stock || 'Stock?'}</span>
+                            </div>
                         </div>
-                    </div>
-                </li>
+                    </li>
                 `).join('');
 
-                // Tarjeta Principal
-                const storeCardHTML = `
-                <div class="bg-white rounded-xl shadow-lg shadow-gray-200/50 border ${borderColor} overflow-hidden flex flex-col h-full">
-                    <div class="${headerColor} px-4 py-3 flex justify-between items-center text-white shadow-sm">
-                        <h3 class="font-bold text-lg tracking-wide flex items-center gap-2 truncate">
-                             ${nombreTienda}
-                        </h3>
-                        <span class="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded-md backdrop-blur-sm">
-                            ${productos.length}
-                        </span>
-                    </div>
-
-                    <div class="overflow-y-auto max-h-[400px] scrollbar-hide">
-                        <ul class="divide-y divide-gray-50">
-                            ${itemsHTML}
-                        </ul>
-                    </div>
-
-                    <a href="#" class="block bg-gray-50 p-3 text-center border-t border-gray-100 text-xs text-gray-400 font-medium hover:text-gray-600 hover:bg-gray-100 transition-colors">
-                        Ver sitio web
-                    </a>
-                </div>
+                const card = `
+                    <article class="store-card">
+                        <div class="store-header" style="background:${headerColor};">
+                            <span>${nombreTienda}</span>
+                            <span style="font-size:.74rem;background:rgba(255,255,255,.2);padding:4px 8px;border-radius:8px;">${productos.length}</span>
+                        </div>
+                        <ul class="store-items">${itemsHTML}</ul>
+                    </article>
                 `;
 
-                container.insertAdjacentHTML('beforeend', storeCardHTML);
+                container.insertAdjacentHTML('beforeend', card);
             }
         }
     </script>
