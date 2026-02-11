@@ -1,64 +1,73 @@
-from playwright.sync_api import sync_playwright
-from playwright_stealth.stealth import stealth_sync
-from bs4 import BeautifulSoup
-import re
-import time
+import asyncio
 import random
+import re
+from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 
-def buscar_productos(query, limite=10):
+async def buscar_productos(query, limite=10):
+    # Construcción de la URL
     url = f"https://www.sigmaelectronica.net/?s={query}&post_type=product"
     
-    print(f"--- PLAYWRIGHT: Iniciando búsqueda para '{query}' ---")
+    print(f"--- SIGMA (Async Stealth): Buscando '{query}' ---")
     
-    # Iniciamos Playwright
-    with sync_playwright() as p:
-        # Lanzamos navegador. 
-        # En GCP/Docker es CRÍTICO usar los args '--no-sandbox'
-        browser = p.chromium.launch(
-            headless=True, 
-            args=['--no-sandbox', '--disable-setuid-sandbox'] 
-        )
-        
-        # Contexto persistente (simula un perfil de usuario)
-        context = browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            viewport={'width': 1920, 'height': 1080}
-        )
-        
-        page = context.new_page()
-        
-        # --- APLICAR STEALTH ---
-        # Esto elimina variables como 'navigator.webdriver' que delatan al bot
-        stealth_sync(page)
+    try:
+        async with async_playwright() as p:
+            # 1. LANZAMIENTO (Con await)
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled'
+                ]
+            )
+            
+            # 2. CONTEXTO (Con await)
+            context = await browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080},
+                locale='es-ES',
+                timezone_id='America/Bogota'
+            )
+            
+            page = await context.new_page()
 
-        try:
-            print(f"--- PLAYWRIGHT: Navegando a {url} ---")
-            page.goto(url, timeout=60000, wait_until='domcontentloaded')
+            # 3. STEALTH MANUAL (Ahora usamos await)
+            await page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                Object.defineProperty(navigator, 'languages', { get: () => ['es-ES', 'es'] });
+            """)
+
+            print(f"--- Navegando a: {url} ---")
             
-            # Pequeña espera aleatoria para parecer humano
-            time.sleep(random.uniform(2, 4))
+            # 4. NAVEGACIÓN Y ESPERAS
+            response = await page.goto(url, timeout=60000, wait_until='domcontentloaded')
             
-            # Esperamos a que aparezca al menos un producto O el mensaje de 'no encontrado'
-            # Esto da tiempo a que JS se ejecute y pase el challenge si es ligero.
+            # Usamos asyncio.sleep en lugar de time.sleep para no bloquear el servidor
+            await asyncio.sleep(random.uniform(2, 4))
+
             try:
-                page.wait_for_selector('.product, .woocommerce-info', timeout=15000)
+                await page.wait_for_selector('.product, .type-product', timeout=10000)
             except Exception:
-                print("--- PLAYWRIGHT: Timeout esperando selector. Posible bloqueo fuerte o carga lenta.")
+                print("--- Warning: Timeout esperando productos ---")
 
-            # Extraemos el HTML renderizado (ya procesado por el navegador)
-            contenido_html = page.content()
+            # 5. OBTENER HTML
+            contenido_html = await page.content()
             
-            # --- DEBUG: Ver si seguimos bloqueados ---
-            if "recaptcha" in contenido_html.lower() or "challenge" in contenido_html.lower():
-                print("--- ALERTA: El HTML aún contiene rastros de ReCAPTCHA/Challenge ---")
+            # Verificación de bloqueo
+            if "cf-ray" in contenido_html.lower() and "captcha" in contenido_html.lower():
+                print("--- BLOQUEO DETECTADO ---")
+                await browser.close()
+                return []
 
-            # --- PARSING (Tu lógica original con BS4) ---
+            # 6. PARSING (BS4 sigue siendo síncrono, es rápido)
             soup = BeautifulSoup(contenido_html, 'html.parser')
             items = soup.select('.product, .type-product')
-            print(f"--- PLAYWRIGHT: Items encontrados en el DOM: {len(items)} ---")
             
+            print(f"--- Items encontrados: {len(items)} ---")
             productos = []
-            
+
             for item in items:
                 try:
                     tag_titulo = item.select_one('.woocommerce-loop-product__title, .product-title, h2, h3')
@@ -84,7 +93,7 @@ def buscar_productos(query, limite=10):
                         src = tag_img.get('src') or tag_img.get('data-src')
                         if src: imagen = src
 
-                    # Stock (Lógica Regex)
+                    # Stock
                     stock = "Disponible"
                     texto_item = item.get_text(" ", strip=True)
                     match_stock = re.search(r'Hay\s*(\d+)\s*disponibles', texto_item, re.IGNORECASE)
@@ -108,16 +117,16 @@ def buscar_productos(query, limite=10):
                 except Exception:
                     continue
 
-            browser.close()
+            await browser.close()
             return productos
 
-        except Exception as e:
-            print(f"Error crítico Playwright: {e}")
-            browser.close()
-            return []
+    except Exception as e:
+        print(f"--- ERROR CRÍTICO ASYNC: {e} ---")
+        return []
 
+# --- Bloque de Prueba Local (Solo si ejecutas el archivo directo) ---
 if __name__ == "__main__":
-    # Prueba local
-    res = buscar_productos("arduino", limite=5)
+    # asyncio.run crea el loop necesario para probar la función async
+    res = asyncio.run(buscar_productos("arduino", limite=5))
     for p in res:
         print(f"[{p['stock']}] {p['nombre']} - {p['precio']}")

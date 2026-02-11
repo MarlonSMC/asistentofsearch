@@ -53,7 +53,7 @@ async def chat(data: ChatRequest):
         productos_zamux = []
 
     try:
-        productos_sigma = sigma.buscar_productos(query, limite=10)
+        productos_sigma = await sigma.buscar_productos(query, limite=10)
         print(f"Sigma: Encontrados {len(productos_sigma)} productos para '{query}'")
     except Exception as e:
         print(f"Error Sigma: {e}")
