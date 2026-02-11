@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+from playwright_stealth.stealth import stealth_sync
 from bs4 import BeautifulSoup
 import re
 import time
