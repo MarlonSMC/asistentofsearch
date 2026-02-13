@@ -1,38 +1,56 @@
 import os
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
-import arcaelectronica
-import electronilab
-import electrosena
-import jabots
-import mactronica
-import plugandplay
-import sigma
-import vistronica
-import zamux
+# Importamos nuestro nuevo módulo de autenticación
+from auth import router as auth_router, get_current_user
 
-# Inicialización de la aplicación FastAPI
+# Importamos las tiendas (tus scrapers)
+import arcaelectronica, electronilab, electrosena, jabots, mactronica, plugandplay, sigma, vistronica, zamux
+
 app = FastAPI()
 
-# Configuración de carpetas para los archivos HTML
+# 1. MIDDLEWARE DE SESIÓN (Crítico para que funcione auth.py)
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=os.getenv("SESSION_SECRET", "clave-super-secreta-cambiar-en-prod"),
+    max_age=604800 # 7 días de persistencia
+)
+
+# 2. INCLUIR RUTAS DE AUTH
+app.include_router(auth_router)
+
 templates = Jinja2Templates(directory="templates")
 
-# Modelo de datos para recibir mensajes desde el frontend
 class ChatRequest(BaseModel):
     message: str
-    
+
+# --- RUTAS PRINCIPALES ---
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """
-    Sirve el archivo index.html ubicado en la carpeta 'templates'.
-    """
-    return templates.TemplateResponse("index.html", {"request": request})
+    user = get_current_user(request)
+    
+    # Protección: Si no hay usuario, mandar al login de Google
+    if not user:
+        return RedirectResponse(url='/login')
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "user": user,
+        "role": request.session.get('role')
+    })
 
 @app.post("/api/chat")
-async def chat(data: ChatRequest):
+async def chat(data: ChatRequest, request: Request):
+    # Protección de API: Bloquear acceso si no hay sesión
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sesión expirada o inválida")
+
     query = data.message
     
     # 1. Ejecutar búsquedas (Ahora son 3 tiendas)
@@ -132,6 +150,5 @@ async def chat(data: ChatRequest):
 
 if __name__ == '__main__':
     import uvicorn
-    # Configuración del puerto para ejecución local o despliegue
     port = int(os.environ.get('PORT', 8080))
     uvicorn.run(app, host='0.0.0.0', port=port)

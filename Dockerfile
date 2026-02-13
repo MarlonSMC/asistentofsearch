@@ -2,8 +2,8 @@
 FROM python:3.9-slim
 
 # Evitar que Python escriba archivos .pyc y permitir logs en tiempo real
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # 1. Instalar dependencias del sistema necesarias para Playwright
 RUN apt-get update && apt-get install -y \

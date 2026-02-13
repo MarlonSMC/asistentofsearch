@@ -8,3 +8,6 @@ playwright
 playwright-stealth
 httpx
 unidecode
+itsdangerous
+authlib
+python-dotenv
