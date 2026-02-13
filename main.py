@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from typing import List, Optional
 from pydantic import BaseModel
 
 # Importamos nuestro nuevo módulo de autenticación
@@ -27,6 +28,20 @@ templates = Jinja2Templates(directory="templates")
 
 class ChatRequest(BaseModel):
     message: str
+    stores: Optional[List[str]] = None
+
+
+STORE_FUNCTIONS = {
+    "Vistronica": lambda q: vistronica.buscar_productos(q, limite=10),
+    "Electronilab": lambda q: electronilab.buscar_productos(q, limite=10),
+    "Zamux": lambda q: zamux.buscar_productos(q, limite=10),
+    "Sigma": lambda q: sigma.buscar_productos(q, limite=10),
+    "Mactronica": lambda q: mactronica.buscar_productos(q, limite=10),
+    "Arca Electrónica": lambda q: arcaelectronica.buscar_productos(q, limite=10),
+    "Electrónica Plug and Play": lambda q: plugandplay.buscar_productos(q, limite=10),
+    "Electrosena": lambda q: electrosena.buscar_productos(q, limite=10),
+    "Ja-Bots": lambda q: jabots.buscar_productos(q, limite=10),
+}
 
 # --- RUTAS PRINCIPALES ---
 
@@ -53,95 +68,33 @@ async def chat(data: ChatRequest, request: Request):
 
     query = data.message
     
-    # 1. Ejecutar búsquedas (Ahora son 3 tiendas)
-    try:
-        productos_vistronica = await vistronica.buscar_productos(query, limite=10)
-    except:
-        productos_vistronica = []
+    selected_stores = [store for store in (data.stores or STORE_FUNCTIONS.keys()) if store in STORE_FUNCTIONS]
+    if not selected_stores:
+        return {
+            "reply": "Debes seleccionar al menos una tienda para buscar.",
+            "results": {}
+        }
 
-    try:
-        productos_electronilab = electronilab.buscar_productos(query, limite=10)
-    except:
-        productos_electronilab = []
+    resultados_agrupados = {}
+    for store_name in selected_stores:
+        try:
+            productos = STORE_FUNCTIONS[store_name](query)
+            if hasattr(productos, "__await__"):
+                productos = await productos
+            resultados_agrupados[store_name] = productos
+            print(f"{store_name}: Encontrados {len(productos)} productos para '{query}'")
+        except Exception as e:
+            print(f"Error {store_name}: {e}")
+            resultados_agrupados[store_name] = []
 
-    try:
-        # --- NUEVA TIENDA ---
-        productos_zamux = zamux.buscar_productos(query, limite=10)
-    except:
-        productos_zamux = []
+    conteos = {store: len(resultados_agrupados.get(store, [])) for store in selected_stores}
+    total = sum(conteos.values())
 
-    try:
-        productos_sigma = await sigma.buscar_productos(query, limite=10)
-        print(f"Sigma: Encontrados {len(productos_sigma)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Sigma: {e}")
-        productos_sigma = []
-
-    try:
-        productos_mactronica = mactronica.buscar_productos(query, limite=10)
-        print(f"Mactronica: Encontrados {len(productos_mactronica)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Mactronica: {e}")
-        productos_mactronica = []
-
-    try:
-        productos_arcaelectronica = arcaelectronica.buscar_productos(query, limite=10)
-        print(f"Arca Electrónica: Encontrados {len(productos_arcaelectronica)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Arca Electrónica: {e}")
-        productos_arcaelectronica = []
-    
-    try:
-        productos_plugandplay = plugandplay.buscar_productos(query, limite=10)
-        print(f"Electrónica Plug and Play: Encontrados {len(productos_plugandplay)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Electrónica Plug and Play: {e}")
-        productos_plugandplay = []
-    
-    try:
-        productos_electrosena = electrosena.buscar_productos(query, limite=10)
-        print(f"Electrónica Plug and Play: Encontrados {len(productos_electrosena)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Electrónica Plug and Play: {e}")
-        productos_electrosena = []
-    
-    try:
-        productos_jabots = jabots.buscar_productos(query, limite=10)
-        print(f"Ja-Bots: Encontrados {len(productos_jabots)} productos para '{query}'")
-    except Exception as e:
-        print(f"Error Ja-Bots: {e}")
-        productos_jabots = []
-        
-    # Agrupar resultados
-    resultados_agrupados = {
-        "Vistronica": productos_vistronica,
-        "Electronilab": productos_electronilab,
-        "Zamux": productos_zamux,
-        "Sigma": productos_sigma,
-        "Mactronica": productos_mactronica,
-        "Arca Electrónica": productos_arcaelectronica,
-        "Electrónica Plug and Play": productos_plugandplay,
-        "Electrosena": productos_electrosena,
-        "Ja-Bots": productos_jabots
-    }
-
-    # 3. Mensaje resumen
-    count_vistronica = len(productos_vistronica)
-    count_electronilab = len(productos_electronilab)
-    count_zamux = len(productos_zamux)
-    count_sigma = len(productos_sigma)
-    count_magtronica = len(productos_mactronica)
-    count_arcaelectronica = len(productos_arcaelectronica)
-    count_plugandplay = len(productos_plugandplay)
-    count_electrosena = len(productos_electrosena)
-    count_jabots = len(productos_jabots)
-    
-    total = count_vistronica + count_electronilab + count_zamux + count_sigma + count_magtronica + count_arcaelectronica + count_plugandplay + count_electrosena + count_jabots
-    
     if total > 0:
-        reply = f"Encontré {total} resultados: {count_vistronica} en Vistronica, {count_electronilab} en Electronilab, {count_zamux} en Zamux, {count_sigma} en Sigma, {count_magtronica} en Mactronica, {count_arcaelectronica} en Arca Electrónica, {count_plugandplay} en Electrónica Plug and Play y {count_electrosena} en Electrosena y {count_jabots} en Ja-Bots."
+        resumen_tiendas = ", ".join([f"{count} en {store}" for store, count in conteos.items()])
+        reply = f"Encontré {total} resultados: {resumen_tiendas}."
     else:
-        reply = f"No encontré nada relacionado con '{query}' en las tiendas."
+        reply = f"No encontré nada relacionado con '{query}' en las tiendas seleccionadas."
 
     return {
         "reply": reply,

@@ -158,6 +158,29 @@
             color: rgba(165, 190, 226, .85);
         }
 
+        .stores-filter {
+            width: min(700px, 92vw);
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .store-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(140, 201, 255, .28);
+            background: rgba(8, 12, 31, .64);
+            font-size: .78rem;
+            color: #d9e8ff;
+        }
+
+        .store-pill input { accent-color: #63d2ff; }
+
         .state-idle .search-stage { top: 38vh; }
 
         .state-consume .search-shell {
@@ -302,6 +325,18 @@
                     <button class="send-btn" onclick="sendQuery()">Buscar</button>
                 </div>
 
+                <div class="stores-filter" id="storesFilter">
+                    <label class="store-pill"><input type="checkbox" value="Vistronica" checked>Vistronica</label>
+                    <label class="store-pill"><input type="checkbox" value="Electronilab" checked>Electronilab</label>
+                    <label class="store-pill"><input type="checkbox" value="Zamux" checked>Zamux</label>
+                    <label class="store-pill"><input type="checkbox" value="Sigma" checked>Sigma</label>
+                    <label class="store-pill"><input type="checkbox" value="Mactronica" checked>Mactronica</label>
+                    <label class="store-pill"><input type="checkbox" value="Arca Electrónica" checked>Arca Electrónica</label>
+                    <label class="store-pill"><input type="checkbox" value="Electrónica Plug and Play" checked>Plug and Play</label>
+                    <label class="store-pill"><input type="checkbox" value="Electrosena" checked>Electrosena</label>
+                    <label class="store-pill"><input type="checkbox" value="Ja-Bots" checked>Ja-Bots</label>
+                </div>
+
                 <span id="statusLabel" class="status-label hidden">Analizando información…</span>
             </div>
         </header>
@@ -342,8 +377,15 @@
             const responseText = document.getElementById('responseText');
             const cardsContainer = document.getElementById('cardsContainer');
             const message = input.value.trim();
+            const selectedStores = Array.from(document.querySelectorAll('#storesFilter input[type="checkbox"]:checked')).map(cb => cb.value);
 
             if (!message) return;
+            if (!selectedStores.length) {
+                responseText.textContent = 'Selecciona al menos una tienda para buscar.';
+                resultBox.classList.remove('hidden');
+                setUiState('results');
+                return;
+            }
 
             input.blur();
             input.disabled = true;
@@ -358,7 +400,7 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message, stores: selectedStores })
                 });
 
                 const data = await response.json();
