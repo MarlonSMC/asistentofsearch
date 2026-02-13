@@ -303,10 +303,12 @@
             }
             .state-results .stores-filter {
                 width: 100%;
+                max-width: 100%;
+                min-width: 0;
                 justify-content: flex-start;
                 flex-wrap: nowrap;
                 overflow-x: auto;
-                padding: 0 2px 4px;
+                padding: 0 0 4px;
                 -webkit-overflow-scrolling: touch;
             }
             .state-results .stores-filter::-webkit-scrollbar {
@@ -319,6 +321,10 @@
             .store-pill {
                 flex: 0 0 auto;
                 white-space: nowrap;
+            }
+            .state-results .search-shell {
+                min-width: 0;
+                width: 100%;
             }
             .search-shell { padding: 8px 8px 8px 12px; }
             .send-btn { padding: 8px 14px; }
