@@ -355,6 +355,7 @@
                     <button class="send-btn" onclick="sendQuery()">Buscar</button>
                 </div>
 
+                {% if role != 'viewer' %}
                 <div class="stores-filter" id="storesFilter">
                     <label class="store-pill"><input type="checkbox" value="Vistronica" checked>Vistronica</label>
                     <label class="store-pill"><input type="checkbox" value="Electronilab" checked>Electronilab</label>
@@ -366,6 +367,7 @@
                     <label class="store-pill"><input type="checkbox" value="Electrosena" checked>Electrosena</label>
                     <label class="store-pill"><input type="checkbox" value="Ja-Bots" checked>Ja-Bots</label>
                 </div>
+                {% endif %}
 
                 <span id="statusLabel" class="status-label hidden">Analizando información…</span>
             </div>
@@ -382,6 +384,13 @@
     <script>
         const body = document.body;
         const statusLabel = document.getElementById('statusLabel');
+        const storesFilter = document.getElementById('storesFilter');
+        const USER_ROLE = "{{ role | default('viewer') }}";
+        const isViewer = USER_ROLE === 'viewer';
+
+        if (isViewer && storesFilter) {
+            storesFilter.classList.add('hidden');
+        }
 
         function setUiState(state) {
             body.classList.remove('state-idle', 'state-consume', 'state-loading', 'state-results');
@@ -407,10 +416,12 @@
             const responseText = document.getElementById('responseText');
             const cardsContainer = document.getElementById('cardsContainer');
             const message = input.value.trim();
-            const selectedStores = Array.from(document.querySelectorAll('#storesFilter input[type="checkbox"]:checked')).map(cb => cb.value);
+            const selectedStores = isViewer
+                ? []
+                : Array.from(document.querySelectorAll('#storesFilter input[type="checkbox"]:checked')).map(cb => cb.value);
 
             if (!message) return;
-            if (!selectedStores.length) {
+            if (!isViewer && !selectedStores.length) {
                 responseText.textContent = 'Selecciona al menos una tienda para buscar.';
                 resultBox.classList.remove('hidden');
                 setUiState('results');
@@ -430,7 +441,7 @@
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, stores: selectedStores })
+                    body: JSON.stringify(isViewer ? { message } : { message, stores: selectedStores })
                 });
 
                 const data = await response.json();
@@ -472,16 +483,28 @@
                     <li>
                         <img src="${p.imagen || 'https://via.placeholder.com/46?text=N/A'}" alt="img" loading="lazy">
                         <div style="min-width:0;flex:1;">
-                            <a href="${p.url}" target="_blank" style="display:block;color:#ddebff;font-size:.86rem;font-weight:600;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre}</a>
+                            ${isViewer
+                                ? `<span style="display:block;color:#ddebff;font-size:.86rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre}</span>`
+                                : `<a href="${p.url}" target="_blank" style="display:block;color:#ddebff;font-size:.86rem;font-weight:600;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre}</a>`
+                            }
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;gap:8px;">
                                 <span style="font-size:.85rem;font-weight:700;color:#f1f5ff;">${p.precio}</span>
-                                <span style="font-size:.65rem;padding:2px 8px;border-radius:999px;border:1px solid ${p.stock === 'Agotado' ? '#7f1d1d' : '#14532d'};color:${p.stock === 'Agotado' ? '#fecaca' : '#bbf7d0'};background:${p.stock === 'Agotado' ? 'rgba(127,29,29,.35)' : 'rgba(20,83,45,.35)'};">${p.stock || 'Stock?'}</span>
+                                ${isViewer
+                                    ? ''
+                                    : `<span style="font-size:.65rem;padding:2px 8px;border-radius:999px;border:1px solid ${p.stock === 'Agotado' ? '#7f1d1d' : '#14532d'};color:${p.stock === 'Agotado' ? '#fecaca' : '#bbf7d0'};background:${p.stock === 'Agotado' ? 'rgba(127,29,29,.35)' : 'rgba(20,83,45,.35)'};">${p.stock || 'Stock?'}</span>`
+                                }
                             </div>
                         </div>
                     </li>
                 `).join('');
 
-                const card = `
+                const card = isViewer
+                    ? `
+                    <article class="store-card">
+                        <ul class="store-items">${itemsHTML}</ul>
+                    </article>
+                `
+                    : `
                     <article class="store-card">
                         <div class="store-header" style="background:${headerColor};">
                             <span>${nombreTienda}</span>

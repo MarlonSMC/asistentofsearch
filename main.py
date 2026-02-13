@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -67,13 +67,18 @@ async def chat(data: ChatRequest, request: Request):
         raise HTTPException(status_code=401, detail="Sesión expirada o inválida")
 
     query = data.message
-    
-    selected_stores = [store for store in (data.stores or STORE_FUNCTIONS.keys()) if store in STORE_FUNCTIONS]
-    if not selected_stores:
-        return {
-            "reply": "Debes seleccionar al menos una tienda para buscar.",
-            "results": {}
-        }
+    role = request.session.get('role', 'viewer')
+
+    if role == 'viewer':
+        selected_stores = list(STORE_FUNCTIONS.keys())
+    else:
+        selected_stores = [store for store in (data.stores or STORE_FUNCTIONS.keys()) if store in STORE_FUNCTIONS]
+        if not selected_stores:
+            return {
+                "reply": "Debes seleccionar al menos una tienda para buscar.",
+                "results": {},
+                "role": role
+            }
 
     resultados_agrupados = {}
     for store_name in selected_stores:
@@ -87,6 +92,29 @@ async def chat(data: ChatRequest, request: Request):
             print(f"Error {store_name}: {e}")
             resultados_agrupados[store_name] = []
 
+    if role == 'viewer':
+        productos_viewer = []
+        for productos in resultados_agrupados.values():
+            for producto in productos:
+                productos_viewer.append({
+                    "nombre": producto.get("nombre", "Producto sin nombre"),
+                    "precio": producto.get("precio", "No disponible"),
+                    "imagen": producto.get("imagen")
+                })
+
+        total = len(productos_viewer)
+        reply = (
+            f"Encontré {total} resultados para tu búsqueda."
+            if total > 0
+            else f"No encontré nada relacionado con '{query}'."
+        )
+
+        return {
+            "reply": reply,
+            "results": {"Productos": productos_viewer},
+            "role": role
+        }
+
     conteos = {store: len(resultados_agrupados.get(store, [])) for store in selected_stores}
     total = sum(conteos.values())
 
@@ -98,7 +126,8 @@ async def chat(data: ChatRequest, request: Request):
 
     return {
         "reply": reply,
-        "results": resultados_agrupados
+        "results": resultados_agrupados,
+        "role": role
     }
 
 if __name__ == '__main__':
