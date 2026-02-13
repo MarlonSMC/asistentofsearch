@@ -2,31 +2,27 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from authlib.integrations.starlette_client import OAuth
-from starlette.config import Config
-
+from google.cloud import firestore  # <--- NUEVO IMPORT
 from dotenv import load_dotenv
 
+# Cargar variables de entorno
+load_dotenv()
 
 # Creamos un "sub-router" para autenticación
 router = APIRouter()
 
 # --- CONFIGURACIÓN DE GOOGLE ---
-# Carga variables de entorno (asegúrate de tener .env o vars de sistema)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
+# Validación rápida de credenciales en consola
+if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    print("!!! ERROR CRÍTICO: Faltan credenciales de Google en .env !!!")
+else:
+    print(f"DEBUG: Credenciales leídas correctamente. Client ID termina en: ...{GOOGLE_CLIENT_ID[-5:]}")
+
+# Inicializar OAuth
 oauth = OAuth()
-# --- DEBUG TEMPORAL (Borrar en producción) ---
-load_dotenv()
-client_id = os.getenv("GOOGLE_CLIENT_ID")
-client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-
-print(f"DEBUG: Client ID RAW: {repr(client_id)}")
-if not client_id:
-    print("!!! ERROR CRÍTICO: GOOGLE_CLIENT_ID está vacío o es None !!!")
-
-print(f"DEBUG: Client Secret leído: {'OK (Oculto)' if client_secret else '!!! VACÍO !!!'}")
-# ---------------------------------------------
 oauth.register(
     name='google',
     client_id=GOOGLE_CLIENT_ID,
@@ -35,19 +31,31 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# --- LISTA BLANCA DE ACCESO ---
-AUTHORIZED_USERS = {
-    "marlon951215@gmail.com": "admin",
-    "parsecelectronica@gmail.com": "admin",
-    "invitado@ejemplo.com": "viewer"
-}
+# --- INICIALIZAR FIRESTORE ---
+# Se autentica automáticamente en Cloud Run. En local requiere 'gcloud auth application-default login'
+# En auth.py, cambia la línea donde creas el cliente:
+try:
+    # Especificamos el ID de la base de datos que creaste
+    db = firestore.Client(project="project-3b15455d-b6f3-47a3-9ca", database="asistentofsearchdb")
+    print("DEBUG: Cliente de Firestore inicializado en database: asistentofsearchdb")
+except Exception as e:
+    print(f"ERROR: No se pudo conectar a Firestore: {e}")
+    db = None
 
 # --- RUTAS DE AUTH ---
 
 @router.get("/login")
 async def login(request: Request):
-    # Construye la URL de callback dinámicamente
+    # 1. Genera la URL base (en Cloud Run esto suele salir como http:// por el proxy)
     redirect_uri = request.url_for('auth_callback')
+    
+    # 2. CORRECCIÓN AUTOMÁTICA HTTPS:
+    # Si NO estamos en localhost, forzamos https para que Google no rechace la petición
+    redirect_str = str(redirect_uri)
+    if "localhost" not in redirect_str and "127.0.0.1" not in redirect_str:
+        redirect_uri = redirect_str.replace("http://", "https://")
+    
+    print(f"DEBUG: Redirigiendo a Google con URI: {redirect_uri}")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @router.get("/auth/callback", name="auth_callback")
@@ -58,19 +66,37 @@ async def auth_callback(request: Request):
         
         if user_info:
             email = user_info.get('email')
-            
-            # Verificación estricta de lista blanca
-            if email in AUTHORIZED_USERS:
-                # Guardamos usuario y rol en la cookie de sesión cifrada
-                request.session['user'] = dict(user_info)
-                request.session['role'] = AUTHORIZED_USERS[email]
-                return RedirectResponse(url='/')
+            print(f"DEBUG: Intentando autenticar usuario: {email}")
+
+            # --- VERIFICACIÓN EN FIRESTORE ---
+            if db:
+                # Buscamos el documento cuyo ID sea el correo electrónico
+                doc_ref = db.collection('authorized_users').document(email)
+                doc = doc_ref.get()
+
+                if doc.exists:
+                    # El usuario existe en la DB
+                    datos_usuario = doc.to_dict()
+                    # Obtenemos el rol de la DB, si no existe, asignamos 'viewer' por defecto
+                    rol_usuario = datos_usuario.get('rol', 'viewer') 
+                    
+                    # Guardamos en sesión
+                    request.session['user'] = dict(user_info)
+                    request.session['role'] = rol_usuario
+                    
+                    print(f"ACCESO CONCEDIDO: {email} con rol {rol_usuario}")
+                    return RedirectResponse(url='/')
+                else:
+                    print(f"ACCESO DENEGADO: {email} no está en la colección 'usuarios_permitidos'")
+                    return HTMLResponse(
+                        content=f"<h1>Acceso Denegado 403</h1><p>El usuario {email} no tiene permisos registrados en la base de datos.</p>", 
+                        status_code=403
+                    )
             else:
-                return HTMLResponse(
-                    content=f"<h1>Acceso Denegado 403</h1><p>El usuario {email} no tiene permisos.</p>", 
-                    status_code=403
-                )
+                 return HTMLResponse(content="Error interno: No hay conexión a la base de datos.", status_code=500)
+
     except Exception as e:
+        print(f"ERROR AUTH: {str(e)}")
         return HTMLResponse(content=f"Error de autenticación: {str(e)}", status_code=400)
         
     return RedirectResponse(url='/login')
