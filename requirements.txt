@@ -11,3 +11,4 @@ unidecode
 itsdangerous
 authlib
 python-dotenv
+google-cloud-firestore
