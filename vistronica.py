@@ -91,7 +91,7 @@ async def buscar_productos(query: str, limite: int = 10):
                 resultados.append({
                     "nombre": nombre_original,
                     "precio": precio,
-                    "stock": "Disponible", # Si está en el search cache, suele haber stock
+                    "stock": item.get("stock_qty"), # Si está en el search cache, suele haber stock
                     "url": url_prod,
                     "imagen": item.get("image") or item.get("image_link_small"),
                     "tienda": "Vistronica"
