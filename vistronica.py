@@ -9,6 +9,40 @@ CATALOGO_CACHE = {"data": None, "last_updated": 0}
 CACHE_DURATION = 3600  # 1 hora de caché es suficiente
 URL_BASE = "https://www.vistronica.com/cotizaciones/products_search_cache.json"
 
+
+def _formatear_precio(item: dict):
+    """Prioriza el precio que normalmente ve el usuario en la tienda."""
+    # En PrestaShop suele mostrarse al cliente el precio con impuestos incluidos.
+    candidatos_texto = [
+        item.get("price_tax_incl_formatted"),
+        item.get("price_formatted"),
+    ]
+    for valor in candidatos_texto:
+        if isinstance(valor, str) and valor.strip():
+            return valor.strip()
+
+    candidatos_numericos = [
+        item.get("price_tax_incl"),
+        item.get("price"),
+    ]
+    for valor in candidatos_numericos:
+        if valor is None or valor == "":
+            continue
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            continue
+
+        numero_str = f"{numero:.2f}".rstrip("0").rstrip(".")
+        entero, *decimales = numero_str.split(".")
+        entero_con_puntos = f"{int(entero):,}".replace(",", ".")
+        if decimales:
+            return f"${entero_con_puntos},{decimales[0]}"
+        return f"${entero_con_puntos}"
+
+    return "No disponible"
+
+
 async def get_catalogo():
     """Descarga el JSON completo simulando ser un navegador real."""
     global CATALOGO_CACHE
@@ -83,10 +117,8 @@ async def buscar_productos(query: str, limite: int = 10):
                 if url_prod and not url_prod.startswith("http"):
                     url_prod = f"https://www.vistronica.com/{url_prod}"
                 
-                # Precio (formateo simple)
-                precio = item.get("price") or item.get("price_tax_incl")
-                if precio:
-                    precio = f"${precio}"
+                # Precio (prioriza formato/impuesto mostrado al usuario final)
+                precio = _formatear_precio(item)
 
                 resultados.append({
                     "nombre": nombre_original,
